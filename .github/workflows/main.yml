@@ -1,35 +1,45 @@
 name: RKNN Convert Bot
 
 on:
-  workflow_dispatch: # 允许手动点击开始
+  workflow_dispatch: 
 
 jobs:
   convert:
-    runs-on: ubuntu-latest # 使用 GitHub 的免费 Ubuntu 服务器
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v4 # 升级到 v4
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5 # 升级到 v5
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # 安装依赖
       - name: Install Dependencies
         run: |
+          # 1. 安装基础工具
           pip install numpy==1.26.4 onnx==1.16.0 onnxruntime==1.18.0 opencv-python
-          # 自动下载并安装瑞芯微工具包
-          git clone https://github.com/rockchip-linux/rknn-toolkit2.git
-          pip install rknn-toolkit2/rknn-toolkit2/packages/rknn_toolkit2-2.3.0-cp310-cp310-linux_x86_64.whl
+          
+          # 2. 克隆最新的官方仓库 (airockchip 是目前维护的版本)
+          git clone https://github.com/airockchip/rknn-toolkit2.git
+          
+          # 3. 动态定位并安装环境依赖 (requirements 文件)
+          # 使用通配符找到 packages 目录下的 cp310 依赖文件
+          REQ_FILE=$(ls rknn-toolkit2/rknn-toolkit2/packages/requirements_cp310-*.txt | head -n 1)
+          echo "Found requirements file: $REQ_FILE"
+          pip install -r "$REQ_FILE"
+          
+          # 4. 动态定位并安装 RKNN 工具包 (.whl 文件)
+          # 自动寻找符合 cp310 和 x86_64 的安装包，解决文件名不一致的问题
+          WHL_FILE=$(ls rknn-toolkit2/rknn-toolkit2/packages/rknn_toolkit2-*-cp310-cp310-*.whl | head -n 1)
+          echo "Found WHL file: $WHL_FILE"
+          pip install "$WHL_FILE"
 
-      # 运行转换脚本
       - name: Run Conversion
         run: python convert_script.py
 
-      # 关键修复：升级到 v4 以解决弃用问题
       - name: Upload Result
-        uses: actions/upload-artifact@v4 
+        uses: actions/upload-artifact@v4
         with:
           name: rknn-model
           path: yolo11n.rknn
